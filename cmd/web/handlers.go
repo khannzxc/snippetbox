@@ -21,7 +21,7 @@ func (app *applicaton) home(w http.ResponseWriter, r *http.Request) {
 	}
 	err = ts.ExecuteTemplate(w, "base", nil)
 	if err != nil {
-		app.serverError(w, e, err)
+		app.serverError(w, r, err)
 	}
 }
 
