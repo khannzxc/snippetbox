@@ -1,41 +1,56 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"log/slog"
 	"net/http"
 	"os"
+
+	_ "github.com/go-sql-driver/mysql"
+	"snippetbox.sog.net/internal/models"
 )
 
 type applicaton struct {
-	logger *slog.Logger
+	logger   *slog.Logger
+	snippets *models.SnippetModel
 }
 
 func main() {
-	// Register the two new handler functions and corresponding route patterns with
-	// the servemux, in exactly the same way that we did before.
-	addr := flag.String("addr", "localhost:4000", "HTTP network address")
 
+	addr := flag.String("addr", "127.0.0.1:4000", "HTTP network address")
+	dsn := flag.String("dsn", "web:root@/snippetbox?parseTime=true", "mysql data source name")
 	flag.Parse()
-	//infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	app := &applicaton{
-		logger: logger,
+
+	db, err := openDB(*dsn)
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
 	}
-	//errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+	defer db.Close()
 
-	// srv := &http.Server{
-	// 	Addr:     *addr,
-	// 	ErrorLog: errorLog,
-	// 	Handler:  mux,
-	// }
+	app := &applicaton{
+		logger:   logger,
+		snippets: &models.SnippetModel{DB: db},
+	}
 
-	// infoLog.Printf("Starting server on %s", *addr)
-	// err := srv.ListenAndServe()
-	// errorLog.Fatal(err)
-
-	logger.Info("starting server", "addr", addr)
-	err := http.ListenAndServe(*addr, app.routes())
+	logger.Info("starting server", "addr", *addr)
+	err = http.ListenAndServe(*addr, app.routes())
 	logger.Error(err.Error())
 	os.Exit(1)
+}
+
+func openDB(dsn string) (*sql.DB, error) {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+	err = db.Ping()
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	return db, nil
 }
